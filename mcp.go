@@ -145,6 +145,18 @@ func (s *MCPServer) processToolCall(rawParams json.RawMessage) (any, *Error) {
 		return s.execGetMetrics(params.Arguments)
 	case "get_active":
 		return s.execGetActive(params.Arguments)
+	case "list_reports":
+		return s.execListReports(params.Arguments)
+	case "get_report":
+		return s.execGetReport(params.Arguments)
+	case "create_report":
+		return s.execCreateReport(params.Arguments)
+	case "update_report":
+		return s.execUpdateReport(params.Arguments)
+	case "delete_report":
+		return s.execDeleteReport(params.Arguments)
+	case "run_report":
+		return s.execRunReport(params.Arguments)
 	default:
 		return nil, &Error{Code: -32602, Message: fmt.Sprintf("Unknown tool: %s", params.Name)}
 	}
@@ -197,8 +209,8 @@ var promptTemplates = map[string]string{
 var promptDefaults = map[string]map[string]string{
 	"analytics-report": {"days": "30"},
 	"top-pages":        {"days": "7", "limit": "10"},
-	"visitor-insights":  {"days": "30"},
-	"realtime-check":    {},
+	"visitor-insights": {"days": "30"},
+	"realtime-check":   {},
 }
 
 func (s *MCPServer) processPromptsGet(rawParams json.RawMessage) (any, *Error) {

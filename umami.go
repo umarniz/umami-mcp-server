@@ -96,10 +96,23 @@ func (c *UmamiClient) Authenticate() error {
 	return nil
 }
 func (c *UmamiClient) doRequest(path string, params map[string]string) ([]byte, error) {
+	return c.doJSONRequest(http.MethodGet, path, params, nil)
+}
+
+func (c *UmamiClient) doJSONRequest(method, path string, params map[string]string, body any) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, http.NoBody)
+	var requestBody io.Reader = http.NoBody
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		requestBody = bytes.NewReader(data)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -125,16 +138,65 @@ func (c *UmamiClient) doRequest(path string, params map[string]string) ([]byte, 
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	return body, nil
+	return respBody, nil
+}
+
+type ReportRequest struct {
+	WebsiteID   string         `json:"websiteId"`
+	Type        string         `json:"type"`
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters"`
+}
+
+func (c *UmamiClient) ListReports(websiteID, reportType string, page, pageSize int) (json.RawMessage, error) {
+	params := map[string]string{"websiteId": websiteID}
+	if reportType != "" {
+		params["type"] = reportType
+	}
+	if page > 0 {
+		params["page"] = fmt.Sprintf("%d", page)
+	}
+	if pageSize > 0 {
+		params["pageSize"] = fmt.Sprintf("%d", pageSize)
+	}
+
+	data, err := c.doRequest(c.basePath()+"/reports", params)
+	return json.RawMessage(data), err
+}
+
+func (c *UmamiClient) GetReport(reportID string) (json.RawMessage, error) {
+	data, err := c.doRequest(fmt.Sprintf("%s/reports/%s", c.basePath(), reportID), nil)
+	return json.RawMessage(data), err
+}
+
+func (c *UmamiClient) CreateReport(report ReportRequest) (json.RawMessage, error) {
+	data, err := c.doJSONRequest(http.MethodPost, c.basePath()+"/reports", nil, report)
+	return json.RawMessage(data), err
+}
+
+func (c *UmamiClient) UpdateReport(reportID string, report ReportRequest) (json.RawMessage, error) {
+	data, err := c.doJSONRequest(http.MethodPost, fmt.Sprintf("%s/reports/%s", c.basePath(), reportID), nil, report)
+	return json.RawMessage(data), err
+}
+
+func (c *UmamiClient) DeleteReport(reportID string) (json.RawMessage, error) {
+	data, err := c.doJSONRequest(http.MethodDelete, fmt.Sprintf("%s/reports/%s", c.basePath(), reportID), nil, nil)
+	return json.RawMessage(data), err
+}
+
+func (c *UmamiClient) RunReport(reportType string, payload map[string]any) (json.RawMessage, error) {
+	data, err := c.doJSONRequest(http.MethodPost, fmt.Sprintf("%s/reports/%s", c.basePath(), reportType), nil, payload)
+	return json.RawMessage(data), err
 }
 
 type Website struct {

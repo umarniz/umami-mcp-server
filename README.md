@@ -386,6 +386,14 @@ For clients that use a `command` field (Claude Desktop, Cursor, etc.):
 | `get_pageviews` | Pageview and session counts grouped by time unit |
 | `get_metrics` | Breakdown by page, referrer, browser, OS, device, country, etc. |
 | `get_active` | Current active visitor count in real-time |
+| `list_reports` | List saved Umami reports for a website |
+| `get_report` | Fetch a saved report by ID |
+| `create_report` | Create saved dashboard reports such as goals, funnels, retention, attribution, breakdown, journey, revenue, UTM, performance, and insights reports |
+| `update_report` | Update a saved report definition |
+| `delete_report` | Delete a saved report |
+| `run_report` | Execute a report query without saving it |
+
+Umami's public API exposes goals, funnels, retention/cohort-style analysis, attribution, breakdowns, journeys, revenue, UTM, performance, and insights as reports. Segments and cohorts can be applied by passing their UUIDs in report parameters or filters when your Umami instance supports them; Umami does not currently expose public segment/cohort CRUD endpoints.
 
 ## Configuration
 

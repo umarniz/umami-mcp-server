@@ -511,6 +511,135 @@ func TestUmamiClient_GetActive_SingleValue(t *testing.T) {
 	}
 }
 
+func TestUmamiClient_ReportRequests(t *testing.T) {
+	reportID := "11111111-1111-1111-1111-111111111111"
+	websiteID := "22222222-2222-2222-2222-222222222222"
+
+	server := httptest.NewServer(reportRequestsHandler(t, reportID, websiteID))
+	defer server.Close()
+
+	client := &UmamiClient{
+		baseURL:    server.URL,
+		token:      "test-token",
+		httpClient: &http.Client{},
+	}
+	report := ReportRequest{
+		WebsiteID: websiteID,
+		Type:      "goal",
+		Name:      "Signup goal",
+		Parameters: map[string]any{
+			"type":  "event",
+			"value": "signup",
+		},
+	}
+
+	if _, err := client.ListReports(websiteID, "goal", 1, 20); err != nil {
+		t.Fatalf("ListReports failed: %v", err)
+	}
+	if _, err := client.GetReport(reportID); err != nil {
+		t.Fatalf("GetReport failed: %v", err)
+	}
+	if _, err := client.CreateReport(report); err != nil {
+		t.Fatalf("CreateReport failed: %v", err)
+	}
+	report.Name = "Updated signup goal"
+	if _, err := client.UpdateReport(reportID, report); err != nil {
+		t.Fatalf("UpdateReport failed: %v", err)
+	}
+	if _, err := client.DeleteReport(reportID); err != nil {
+		t.Fatalf("DeleteReport failed: %v", err)
+	}
+	if _, err := client.RunReport(reportTypeFunnel, map[string]any{"websiteId": websiteID, "steps": []any{}}); err != nil {
+		t.Fatalf("RunReport failed: %v", err)
+	}
+}
+
+func reportRequestsHandler(t *testing.T, reportID, websiteID string) http.Handler {
+	t.Helper()
+
+	handlers := map[string]http.HandlerFunc{
+		http.MethodGet + " /api/reports": func(w http.ResponseWriter, r *http.Request) {
+			assertListReportsRequest(t, r, websiteID)
+			_, _ = w.Write([]byte(`{"data":[],"count":0}`))
+		},
+		http.MethodGet + " /api/reports/" + reportID: func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"id":"` + reportID + `","type":"goal"}`))
+		},
+		http.MethodPost + " /api/reports": func(w http.ResponseWriter, r *http.Request) {
+			assertCreateGoalReportBody(t, r, websiteID)
+			_, _ = w.Write([]byte(`{"id":"` + reportID + `"}`))
+		},
+		http.MethodPost + " /api/reports/" + reportID: func(w http.ResponseWriter, r *http.Request) {
+			assertUpdatedReportBody(t, r)
+			_, _ = w.Write([]byte(`{"id":"` + reportID + `","name":"Updated signup goal"}`))
+		},
+		http.MethodDelete + " /api/reports/" + reportID: func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"id":"` + reportID + `"}`))
+		},
+		http.MethodPost + " /api/reports/" + reportTypeFunnel: func(w http.ResponseWriter, r *http.Request) {
+			assertRunReportBody(t, r, websiteID)
+			_, _ = w.Write([]byte(`{"steps":[]}`))
+		},
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		handler, ok := handlers[r.Method+" "+r.URL.Path]
+		if !ok {
+			t.Fatalf("Unexpected request: %s %s", r.Method, r.URL.String())
+		}
+		handler(w, r)
+	})
+}
+
+func assertListReportsRequest(t *testing.T, r *http.Request, websiteID string) {
+	t.Helper()
+
+	if r.URL.Query().Get("websiteId") != websiteID {
+		t.Errorf("Expected websiteId query, got %s", r.URL.RawQuery)
+	}
+	if r.URL.Query().Get("type") != "goal" {
+		t.Errorf("Expected type=goal, got %s", r.URL.Query().Get("type"))
+	}
+}
+
+func assertCreateGoalReportBody(t *testing.T, r *http.Request, websiteID string) {
+	t.Helper()
+
+	body := decodeRequestBody(t, r)
+	if body["websiteId"] != websiteID || body["type"] != "goal" || body["name"] != "Signup goal" {
+		t.Errorf("Unexpected create body: %#v", body)
+	}
+}
+
+func assertUpdatedReportBody(t *testing.T, r *http.Request) {
+	t.Helper()
+
+	body := decodeRequestBody(t, r)
+	if body["name"] != "Updated signup goal" {
+		t.Errorf("Unexpected update body: %#v", body)
+	}
+}
+
+func assertRunReportBody(t *testing.T, r *http.Request, websiteID string) {
+	t.Helper()
+
+	body := decodeRequestBody(t, r)
+	if body["websiteId"] != websiteID {
+		t.Errorf("Unexpected run body: %#v", body)
+	}
+}
+
+func decodeRequestBody(t *testing.T, r *http.Request) map[string]any {
+	t.Helper()
+
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		t.Fatalf("Failed to decode body: %v", err)
+	}
+	return body
+}
+
 func TestUmamiClient_ErrorHandling(t *testing.T) {
 	tests := []struct {
 		name       string

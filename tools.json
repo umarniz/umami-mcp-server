@@ -108,5 +108,145 @@
       },
       "required": ["website_id"]
     }
+  },
+  {
+    "name": "list_reports",
+    "description": "List saved Umami dashboard reports for a website. Saved reports cover Umami creations such as goals, funnels, attribution, breakdowns, journeys, retention/cohort-style reports, revenue, UTM, performance, and insights depending on your Umami version.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "website_id": {
+          "type": "string",
+          "description": "The website ID from get_websites"
+        },
+        "report_type": {
+          "type": "string",
+          "description": "Optional report type filter",
+          "enum": ["attribution", "breakdown", "funnel", "goal", "goals", "insights", "journey", "performance", "retention", "revenue", "utm"]
+        },
+        "page": {
+          "type": "integer",
+          "description": "Optional page number"
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Optional page size"
+        }
+      },
+      "required": ["website_id"]
+    }
+  },
+  {
+    "name": "get_report",
+    "description": "Get a saved Umami report by ID, including its report type and parameters.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "report_id": {
+          "type": "string",
+          "description": "Saved report ID from list_reports or create_report"
+        }
+      },
+      "required": ["report_id"]
+    }
+  },
+  {
+    "name": "create_report",
+    "description": "Create a saved Umami dashboard report. Use type 'goal' for goals, 'funnel' for funnels, 'retention' for cohort-style retention reports, and the other supported types for Umami report creations. Segments and cohorts are referenced by UUID inside parameters or filters when supported by your Umami instance; Umami does not expose public segment/cohort CRUD endpoints.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "website_id": {
+          "type": "string",
+          "description": "The website ID from get_websites"
+        },
+        "type": {
+          "type": "string",
+          "description": "Saved report type",
+          "enum": ["attribution", "breakdown", "funnel", "goal", "goals", "insights", "journey", "performance", "retention", "revenue", "utm"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the saved report"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional report description"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Report-specific parameters. Examples: goal {\"type\":\"event\",\"value\":\"signup\"}; funnel {\"window\":60,\"steps\":[{\"type\":\"path\",\"value\":\"/\"},{\"type\":\"event\",\"value\":\"signup\"}]}. Funnel step type MUST be \"path\" or \"event\"; this server normalizes common URL aliases to \"path\". May include segment/cohort UUID filters when supported by Umami."
+        }
+      },
+      "required": ["website_id", "type", "name", "parameters"]
+    }
+  },
+  {
+    "name": "update_report",
+    "description": "Update a saved Umami dashboard report. Umami expects the full report definition, so include websiteId, type, name, and parameters.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "report_id": {
+          "type": "string",
+          "description": "Saved report ID to update"
+        },
+        "website_id": {
+          "type": "string",
+          "description": "The website ID from get_websites"
+        },
+        "type": {
+          "type": "string",
+          "description": "Saved report type",
+          "enum": ["attribution", "breakdown", "funnel", "goal", "goals", "insights", "journey", "performance", "retention", "revenue", "utm"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Updated report name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional updated report description"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Updated report-specific parameters. For funnel reports, steps must use type \"path\" or \"event\"."
+        }
+      },
+      "required": ["report_id", "website_id", "type", "name", "parameters"]
+    }
+  },
+  {
+    "name": "delete_report",
+    "description": "Delete a saved Umami dashboard report by ID.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "report_id": {
+          "type": "string",
+          "description": "Saved report ID to delete"
+        }
+      },
+      "required": ["report_id"]
+    }
+  },
+  {
+    "name": "run_report",
+    "description": "Run an Umami report query without saving it. Supports report endpoints such as attribution, breakdown, funnel, goal/goals, journey, performance, retention, revenue, UTM, and insights depending on your Umami version. Use payload for the Umami request body, including websiteId, date range, timezone, parameters, filters, segment UUID, or cohort UUID.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "report_type": {
+          "type": "string",
+          "description": "Report endpoint type to execute",
+          "enum": ["attribution", "breakdown", "funnel", "goal", "goals", "insights", "journey", "performance", "retention", "revenue", "utm"]
+        },
+        "payload": {
+          "type": "object",
+          "description": "Request body sent directly to Umami's /api/reports/{report_type} endpoint. For funnel reports, steps must use type \"path\" or \"event\"; URL aliases are normalized to \"path\"."
+        }
+      },
+      "required": ["report_type", "payload"]
+    }
   }
 ]

@@ -243,8 +243,8 @@ func TestHTTP_ServerCard(t *testing.T) {
 	if err := json.Unmarshal(card["tools"], &tools); err != nil {
 		t.Fatalf("Failed to parse tools: %v", err)
 	}
-	if len(tools) != 5 {
-		t.Errorf("Expected 5 tools, got %d", len(tools))
+	if len(tools) != 11 {
+		t.Errorf("Expected 11 tools, got %d", len(tools))
 	}
 
 	var prompts []json.RawMessage

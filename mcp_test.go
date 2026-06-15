@@ -55,11 +55,23 @@ func TestMCPServer_HandleToolsList(t *testing.T) {
 		t.Fatal("Tools is not []map[string]any")
 	}
 
-	if len(toolsInterface) != 5 {
-		t.Fatalf("Expected 5 tools, got %d", len(toolsInterface))
+	if len(toolsInterface) != 11 {
+		t.Fatalf("Expected 11 tools, got %d", len(toolsInterface))
 	}
 
-	expectedTools := []string{"get_websites", "get_stats", "get_pageviews", "get_metrics", "get_active"}
+	expectedTools := []string{
+		"get_websites",
+		"get_stats",
+		"get_pageviews",
+		"get_metrics",
+		"get_active",
+		"list_reports",
+		"get_report",
+		"create_report",
+		"update_report",
+		"delete_report",
+		"run_report",
+	}
 	for i, tool := range toolsInterface {
 		name, ok := tool["name"].(string)
 		if !ok {
@@ -104,8 +116,8 @@ func TestMCPServer_ToolsJSONValidity(t *testing.T) {
 		t.Fatalf("Failed to parse tools JSON: %v", err)
 	}
 
-	if len(tools) != 5 {
-		t.Fatalf("Expected 5 tools, got %d", len(tools))
+	if len(tools) != 11 {
+		t.Fatalf("Expected 11 tools, got %d", len(tools))
 	}
 
 	for i, tool := range tools {
@@ -335,5 +347,105 @@ func TestMCPServer_HandleResourcesRead(t *testing.T) {
 
 	if !strings.Contains(text, "site1") {
 		t.Error("Expected resource content to contain website ID 'site1'")
+	}
+}
+
+func TestMCPServer_CreateReportTool(t *testing.T) {
+	websiteID := "22222222-2222-2222-2222-222222222222"
+	reportID := "11111111-1111-1111-1111-111111111111"
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertCreateReportRequest(t, r, websiteID)
+
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"id":"%s","websiteId":"%s","type":"%s"}`, reportID, websiteID, reportTypeFunnel)
+	}))
+	defer ts.Close()
+
+	server := &MCPServer{client: &UmamiClient{
+		baseURL:    ts.URL,
+		token:      "test-token",
+		httpClient: &http.Client{},
+	}}
+
+	params, _ := json.Marshal(map[string]any{
+		"name": "create_report",
+		"arguments": map[string]any{
+			"website_id": websiteID,
+			"type":       reportTypeFunnel,
+			"name":       "Signup funnel",
+			"parameters": map[string]any{
+				"window": 60,
+				"steps": []map[string]string{
+					{"type": "url", "value": "/"},
+					{"type": "event", "value": "signup"},
+				},
+			},
+		},
+	})
+
+	resp := server.HandleRequest(Request{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "tools/call",
+		Params:  params,
+	})
+
+	if resp.Error != nil {
+		t.Fatalf("Unexpected error: %v", resp.Error)
+	}
+
+	result, ok := resp.Result.(map[string]any)
+	if !ok {
+		t.Fatal("Result is not a map")
+	}
+	content, ok := result["content"].([]map[string]string)
+	if !ok || len(content) != 1 {
+		t.Fatalf("Unexpected content: %#v", result["content"])
+	}
+	if !strings.Contains(content[0]["text"], reportID) {
+		t.Errorf("Expected response to contain report ID %s, got %s", reportID, content[0]["text"])
+	}
+}
+
+func assertCreateReportRequest(t *testing.T, r *http.Request, websiteID string) {
+	t.Helper()
+
+	if r.Method != http.MethodPost || r.URL.Path != "/api/reports" {
+		t.Fatalf("Unexpected request: %s %s", r.Method, r.URL.Path)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		t.Fatalf("Failed to decode body: %v", err)
+	}
+
+	if body["websiteId"] != websiteID {
+		t.Errorf("Expected websiteId %s, got %v", websiteID, body["websiteId"])
+	}
+	if body["type"] != reportTypeFunnel {
+		t.Errorf("Expected type funnel, got %v", body["type"])
+	}
+
+	assertCreateReportFunnelSteps(t, body)
+}
+
+func assertCreateReportFunnelSteps(t *testing.T, body map[string]any) {
+	t.Helper()
+
+	parameters, ok := body["parameters"].(map[string]any)
+	if !ok {
+		t.Fatalf("Expected parameters object, got %#v", body["parameters"])
+	}
+	steps, ok := parameters["steps"].([]any)
+	if !ok || len(steps) != 2 {
+		t.Fatalf("Expected two funnel steps, got %#v", parameters["steps"])
+	}
+	firstStep, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("Expected first funnel step object, got %#v", steps[0])
+	}
+	if firstStep["type"] != metricTypePath {
+		t.Errorf("Expected URL funnel step to normalize to path, got %v", firstStep["type"])
 	}
 }
